@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your Text, Your Style</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Your Text, Your Style – Auto-Generate a Presentation</h1>
+    <form action="/generate" method="post" enctype="multipart/form-data">
+        <label>Paste Your Text:</label><br>
+        <textarea name="text" rows="12" cols="80" required></textarea><br><br>
+
+        <label>Guidance (optional):</label><br>
+        <input type="text" name="guidance"><br><br>
+
+        <label>LLM API Key (optional):</label><br>
+        <input type="password" name="api_key"><br><br>
+
+        <label>Upload PowerPoint Template (.pptx/.potx):</label><br>
+        <input type="file" name="template_file"><br><br>
+
+        <button type="submit">Generate Presentation</button>
+    </form>
+</body>
+</html>
