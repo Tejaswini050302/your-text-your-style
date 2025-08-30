@@ -1,31 +1,35 @@
-# Your Text Your Style 🎨
+# Your Text, Your Style
 
-Convert text into a presentation that matches your chosen PowerPoint template.
+A web app that turns bulk text, markdown, or prose into a styled PowerPoint presentation using your own template.
 
-## Run locally
+## Features
+- Paste text and split into slides automatically
+- Upload `.pptx` template to apply style
+- Download generated presentation
+- User API key is optional (not stored)
 
+## Run Locally
 ```bash
-git clone <your-repo>
-cd your-text-your-style
-docker-compose up --build
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
-Frontend → http://localhost:5173
+Visit http://127.0.0.1:8000
 
-Backend → http://localhost:8000
+Deploy on Render
 
-Features
+1.Push this repo to GitHub.
 
--Upload text + .pptx/.potx template
+2.Create a Render Web Service → Select repo.
 
--Choose LLM provider (currently OpenAI)
+3.Build Command: pip install -r requirements.txt
 
--Secure: BYO API key (not stored)
+4.Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
--Returns downloadable .pptx
 
 ---
 
-✅ Now you can push this repo to GitHub and deploy with:
-```bash
-docker-compose up --build
-```
+### `LICENSE`
+(MIT License)
+
+---
+
