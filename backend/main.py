@@ -1,13 +1,15 @@
-from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import openai, os, json, tempfile
+from fastapi.responses import FileResponse, JSONResponse
+import tempfile
+import os
+import json
 from pptx import Presentation
-from typing import Optional
+import requests
 
 app = FastAPI()
 
-# Allow frontend requests
+# Allow frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,51 +17,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/generate")
-async def generate_ppt(
+@app.get("/")
+def root():
+    return {"status": "Backend running!"}
+
+@app.post("/generate-pptx/")
+async def generate_pptx(
     text: str = Form(...),
-    guidance: Optional[str] = Form(None),
-    provider: str = Form("openai"),
+    guidance: str = Form(""),
+    provider: str = Form(...),
     api_key: str = Form(...),
     template: UploadFile = File(...)
 ):
-    try:
-        # Save uploaded template
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as tmp:
-            content = await template.read()
-            tmp.write(content)
-            template_path = tmp.name
+    # Save template file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as tmp:
+        content = await template.read()
+        tmp.write(content)
+        template_path = tmp.name
 
-        # Initialize OpenAI
-        openai.api_key = api_key
-        prompt = f"Summarize text into slides. Each slide JSON: title, bullets[], notes. Guidance: {guidance}\n\n{text}"
-        resp = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-        )
-        slides_json = resp["choices"][0]["message"]["content"]
-
+    # Call LLM (example: OpenAI, can extend for others)
+    if provider.lower() == "openai":
         try:
-            slides = json.loads(slides_json)
-        except:
-            # fallback
-            slides = [{"title": "Slide 1", "bullets": [text[:100]], "notes": ""}]
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {"role": "system", "content": "Turn text into structured slides JSON."},
+                        {"role": "user", "content": f"{text}\n\nGuidance: {guidance}"}
+                    ],
+                    "response_format": {"type": "json_object"}
+                }
+            )
+            outline = resp.json()["choices"][0]["message"]["content"]
+            slides = json.loads(outline).get("slides", [])
+        except Exception as e:
+            slides = [{"title": "Error", "bullets": [str(e)]}]
+    else:
+        slides = [{"title": "Default Slide", "bullets": ["LLM provider not supported."]}]
 
-        prs = Presentation(template_path)
-        for slide_data in slides:
-            layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(layout)
-            slide.shapes.title.text = slide_data["title"]
-            body = slide.placeholders[1].text_frame
-            for b in slide_data["bullets"]:
-                body.add_paragraph(b)
-            if "notes" in slide_data:
-                slide.notes_slide.notes_text_frame.text = slide_data["notes"]
+    # Load template and add slides
+    prs = Presentation(template_path)
+    layout = prs.slide_layouts[1]  # Title + Content
 
-        out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pptx").name
-        prs.save(out_file)
-        return FileResponse(out_file, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", filename="generated.pptx")
+    for slide in slides:
+        s = prs.slides.add_slide(layout)
+        s.shapes.title.text = slide.get("title", "")
+        content = s.placeholders[1].text_frame
+        content.clear()
+        for bullet in slide.get("bullets", []):
+            content.add_paragraph(bullet)
 
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+    # Save output
+    out_path = template_path.replace(".pptx", "_out.pptx")
+    prs.save(out_path)
+
+    return FileResponse(out_path, filename="generated.pptx")
